@@ -15,6 +15,7 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
+      overflow: hidden;
     }
 
     body.dark {
@@ -25,48 +26,110 @@
     header {
       background: #2c3e50;
       color: white;
-      padding: 1rem;
+      padding: 0.5rem 1rem;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      transform: translateY(-100%);
+      transition: transform 0.3s ease-in-out;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
+    /* Header hover behavior now handled by JavaScript */
+
     #main {
-      padding: 1rem;
+      padding: 0.5rem;
       flex: 1;
-      display: grid;
-      gap: 1rem;
+      display: flex;
+      flex-direction: column;
+      margin-top: 0;
+      height: 100vh;
+    }
+
+    .resize-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .resize-handle {
+      height: 8px;
+      background: #ddd;
+      cursor: ns-resize;
+      border: none;
+      position: relative;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .resize-handle:hover {
+      background: #bbb;
+    }
+
+    body.dark .resize-handle {
+      background: #444;
+    }
+
+    body.dark .resize-handle:hover {
+      background: #666;
+    }
+
+    .resize-handle::before {
+      content: '⋮⋮⋮';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #666;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    body.dark .resize-handle::before {
+      color: #999;
     }
 
     textarea {
       width: 100%;
-      height: 260px;
+      flex: 1;
+      min-height: 200px;
       font-family: monospace;
       font-size: 1rem;
-      padding: 1rem;
-      border-radius: 8px;
+      padding: 0.5rem;
       border: 1px solid #ccc;
+      border-radius: 4px;
       background: white;
       color: black;
+      resize: none;
     }
 
     body.dark textarea {
       background: #121212;
       color: #f0f0f0;
+      border-color: #444;
     }
 
     #output {
       background: white;
-      padding: 1rem;
+      padding: 0.5rem;
       border: 1px solid #ccc;
-      border-radius: 8px;
+      border-radius: 4px;
       overflow: auto;
-      max-height: 80vh;
+      flex: 1;
+      min-height: 200px;
     }
 
     body.dark #output {
       background: #2a2a2a;
+      border-color: #444;
     }
 
     .buttons {
@@ -96,6 +159,55 @@
       background: #1a1a1a;
       color: white;
     }
+
+    body.dark #fileInfo {
+      background: #2a3a4a;
+      color: #f0f0f0;
+    }
+
+    body.dark #newFileBtn {
+      background: #4a9eff;
+    }
+
+    #newFileBtn:hover {
+      background: #0056b3;
+    }
+
+    body.dark #newFileBtn:hover {
+      background: #6bb6ff;
+    }
+
+    /* Header indicator */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 4px;
+      background: #2c3e50;
+      border-radius: 0 0 4px 4px;
+      z-index: 1001;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    body:hover::before {
+      opacity: 0;
+    }
+
+    body.dark::before {
+      background: #1a1a1a;
+    }
+
+    /* Ensure proper flex behavior */
+    .resize-container > * {
+      flex-shrink: 0;
+    }
+
+    textarea, #output {
+      flex-shrink: 1;
+    }
   </style>
 </head>
 <body>
@@ -112,6 +224,9 @@
         <option value="gantt">Gantt Chart</option>
         <option value="pie">Pie Chart</option>
       </select>
+      <button id="loadFileBtn">📁 Load File</button>
+      <button id="saveFileBtn">💾 Save</button>
+      <button id="saveAsFileBtn">💾 Save As</button>
       <button id="themeToggle">🌗 Theme</button>
       <button id="copyBtn">📋 Copy</button>
       <button id="exportSvgBtn">⬇️ SVG</button>
@@ -119,18 +234,32 @@
   </header>
 
   <div id="main">
-    <textarea id="input" placeholder="Write or paste Mermaid code here..."></textarea>
-    <div id="output"></div>
+    <div id="fileInfo" style="margin-bottom: 0.5rem; padding: 0.5rem; background: #e8f4fd; border-radius: 4px; display: none;">
+      <strong>Current file:</strong> <span id="currentFileName">None</span>
+      <button id="newFileBtn" style="margin-left: 1rem; padding: 0.25rem 0.5rem; font-size: 0.8em; background: #007acc; color: white; border: none; border-radius: 3px; cursor: pointer;">New File</button>
+    </div>
+    <div class="resize-container">
+      <textarea id="input" placeholder="Write or paste Mermaid code here..."></textarea>
+      <div class="resize-handle" id="resizeHandle"></div>
+      <div id="output"></div>
+    </div>
   </div>
 
   <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10.9.3/dist/mermaid.esm.min.mjs';
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
     mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
     const input = document.getElementById("input");
     const output = document.getElementById("output");
     const select = document.getElementById("examples");
     const themeBtn = document.getElementById("themeToggle");
+    const fileInfo = document.getElementById("fileInfo");
+    const currentFileName = document.getElementById("currentFileName");
+    const loadFileBtn = document.getElementById("loadFileBtn");
+    const saveFileBtn = document.getElementById("saveFileBtn");
+    const saveAsFileBtn = document.getElementById("saveAsFileBtn");
+    const newFileBtn = document.getElementById("newFileBtn");
+    const resizeHandle = document.getElementById("resizeHandle");
 
     const examples = {
       flowchart: `graph TD
@@ -184,6 +313,8 @@
     };
 
     let darkMode = false;
+    let currentFileHandle = null;
+    let currentFileNameValue = null; // Track filename for fallback browsers
     const renderId = "mermaid-" + Date.now();
 
     function renderMermaid() {
@@ -192,7 +323,6 @@
       try {
         mermaid.render(renderId, code).then(({ svg }) => {
           output.innerHTML = svg;
-          localStorage.setItem("diagramCode", code);
         });
       } catch (err) {
         output.innerHTML = `<pre style="color:red;">${err}</pre>`;
@@ -206,6 +336,262 @@
         timeout = setTimeout(() => fn.apply(this, args), delay);
       };
     }
+
+    // File handling functions
+    async function loadFile() {
+      try {
+        // Check if File System Access API is supported
+        if ('showOpenFilePicker' in window) {
+          const [fileHandle] = await window.showOpenFilePicker({
+            types: [
+              {
+                description: 'Mermaid files',
+                accept: {
+                  'text/plain': ['.mmd', '.mermaid', '.txt'],
+                },
+              },
+            ],
+          });
+          
+          const file = await fileHandle.getFile();
+          const content = await file.text();
+          
+          input.value = content;
+          currentFileHandle = fileHandle;
+          currentFileNameValue = file.name;
+          document.getElementById("currentFileName").textContent = file.name;
+          fileInfo.style.display = 'block';
+          
+          renderMermaid();
+        } else {
+          // Fallback for browsers without File System Access API
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.mmd,.mermaid,.txt';
+          input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const content = await file.text();
+              document.getElementById("input").value = content;
+              currentFileNameValue = file.name;
+              document.getElementById("currentFileName").textContent = file.name;
+              fileInfo.style.display = 'block';
+              renderMermaid();
+            }
+          };
+          input.click();
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          alert('Error loading file: ' + err.message);
+        }
+      }
+    }
+
+    async function saveFile() {
+      try {
+        const content = input.value;
+        if (!content.trim()) {
+          alert('No content to save');
+          return;
+        }
+
+        // If no current file, treat as Save As
+        if (!currentFileHandle && !currentFileNameValue) {
+          await saveAsFile();
+          return;
+        }
+
+        // Check if File System Access API is supported
+        if ('showSaveFilePicker' in window) {
+          const writable = await currentFileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+          
+          alert('File saved successfully!');
+        } else {
+          // Fallback for browsers without File System Access API
+          const fileName = currentFileNameValue || 'diagram.mmd';
+          const blob = new Blob([content], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          link.click();
+          URL.revokeObjectURL(url);
+          
+          alert('File saved successfully!');
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          alert('Error saving file: ' + err.message);
+        }
+      }
+    }
+
+    async function saveAsFile() {
+      try {
+        const content = input.value;
+        if (!content.trim()) {
+          alert('No content to save');
+          return;
+        }
+
+        // Check if File System Access API is supported
+        if ('showSaveFilePicker' in window) {
+          const fileHandle = await window.showSaveFilePicker({
+            types: [
+              {
+                description: 'Mermaid files',
+                accept: {
+                  'text/plain': ['.mmd'],
+                },
+              },
+            ],
+            suggestedName: 'diagram.mmd',
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(content);
+          await writable.close();
+          
+          currentFileHandle = fileHandle;
+          currentFileNameValue = fileHandle.name;
+          document.getElementById("currentFileName").textContent = fileHandle.name;
+          fileInfo.style.display = 'block';
+          
+          alert('File saved successfully!');
+        } else {
+          // Fallback for browsers without File System Access API
+          const fileName = prompt('Enter filename (without extension):', 'diagram');
+          if (fileName) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName.endsWith('.mmd') ? fileName : fileName + '.mmd';
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            currentFileNameValue = link.download;
+            document.getElementById("currentFileName").textContent = link.download;
+            fileInfo.style.display = 'block';
+            
+            alert('File downloaded successfully!');
+          }
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          alert('Error saving file: ' + err.message);
+        }
+      }
+    }
+
+    function newFile() {
+      if (input.value.trim() && !confirm('You have unsaved changes. Are you sure you want to create a new file?')) {
+        return;
+      }
+      
+      input.value = '';
+      currentFileHandle = null;
+      currentFileNameValue = null;
+      document.getElementById("currentFileName").textContent = 'Untitled';
+      fileInfo.style.display = 'block';
+      output.innerHTML = '';
+    }
+
+    // Resize functionality
+    let isResizing = false;
+    let startY = 0;
+    let startInputHeight = 0;
+    let startOutputHeight = 0;
+
+    function startResize(e) {
+      isResizing = true;
+      startY = e.clientY;
+      startInputHeight = input.offsetHeight;
+      startOutputHeight = output.offsetHeight;
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    }
+
+    function doResize(e) {
+      if (!isResizing) return;
+      
+      const deltaY = e.clientY - startY;
+      const newInputHeight = Math.max(200, startInputHeight + deltaY);
+      const newOutputHeight = Math.max(200, startOutputHeight - deltaY);
+      
+      // Only resize if both sections meet minimum height requirements
+      if (newInputHeight >= 200 && newOutputHeight >= 200) {
+        input.style.flex = 'none';
+        output.style.flex = 'none';
+        input.style.height = newInputHeight + 'px';
+        output.style.height = newOutputHeight + 'px';
+      }
+    }
+
+    function stopResize() {
+      isResizing = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    // Initialize resize functionality
+    if (resizeHandle) {
+      resizeHandle.addEventListener('mousedown', startResize);
+      document.addEventListener('mousemove', doResize);
+      document.addEventListener('mouseup', stopResize);
+
+      // Prevent text selection during resize
+      resizeHandle.addEventListener('selectstart', (e) => e.preventDefault());
+      
+      // Add visual feedback
+      resizeHandle.addEventListener('mouseenter', () => {
+        resizeHandle.style.background = '#bbb';
+      });
+      
+      resizeHandle.addEventListener('mouseleave', () => {
+        if (!isResizing) {
+          resizeHandle.style.background = '#ddd';
+        }
+      });
+    }
+
+    // Hide header when focusing on content areas
+    let hideTimeout;
+    
+    function hideHeader() {
+      clearTimeout(hideTimeout);
+      document.querySelector('header').style.transform = 'translateY(-100%)';
+    }
+
+    function showHeader() {
+      clearTimeout(hideTimeout);
+      document.querySelector('header').style.transform = 'translateY(0)';
+    }
+
+    function delayedHideHeader() {
+      hideTimeout = setTimeout(hideHeader, 200);
+    }
+
+    // Hide header when clicking in textarea or output
+    input.addEventListener('focus', hideHeader);
+    output.addEventListener('click', hideHeader);
+    
+    // Show header when hovering over the top area of the page
+    document.addEventListener('mousemove', (e) => {
+      if (e.clientY < 50) { // Top 50px of the page
+        showHeader();
+      }
+    });
+    
+    // Show header when hovering over it
+    document.querySelector('header').addEventListener('mouseenter', showHeader);
+    
+    // Hide header when mouse leaves header area (with delay)
+    document.querySelector('header').addEventListener('mouseleave', delayedHideHeader);
 
     input.addEventListener("input", debounce(renderMermaid, 400));
     select.addEventListener("change", () => {
@@ -239,15 +625,23 @@
       URL.revokeObjectURL(link.href);
     });
 
-    // INIT: restore from localStorage or load default
-    const saved = localStorage.getItem("diagramCode");
-    if (saved) {
-      input.value = saved;
-    } else {
+    // File handling event listeners
+    loadFileBtn.addEventListener("click", loadFile);
+    saveFileBtn.addEventListener("click", saveFile);
+    saveAsFileBtn.addEventListener("click", saveAsFile);
+    newFileBtn.addEventListener("click", newFile);
+
+    // INIT: start with example diagram
+    function initializeApp() {
       input.value = examples["flowchart"];
       select.value = "flowchart";
+      currentFileNameValue = null;
+      document.getElementById("currentFileName").textContent = 'Untitled';
+      fileInfo.style.display = 'block';
+      renderMermaid();
     }
-    renderMermaid();
+    
+    initializeApp();
   </script>
 </body>
 </html>
