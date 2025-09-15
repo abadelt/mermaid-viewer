@@ -217,6 +217,7 @@
       <select id="examples">
         <option disabled value="">📄 Insert example...</option>
         <option value="flowchart" selected>Flowchart</option>
+        <option value="icons">Icons Example</option>
         <option value="sequence">Sequence Diagram</option>
         <option value="class">Class Diagram</option>
         <option value="state">State Machine</option>
@@ -248,6 +249,28 @@
 
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.registerIconPacks([
+      {
+        name: 'logos',
+        loader: () =>
+          fetch('https://unpkg.com/@iconify-json/logos@1/icons.json').then((res) => res.json()),
+      },
+      {
+        name: 'tb',
+        loader: () =>
+          fetch('https://unpkg.com/@iconify-json/token-branded@1.2.26/icons.json').then((res) => res.json()),
+      },
+      {
+        name: 'spinners',
+        loader: () =>
+          fetch('https://unpkg.com/@iconify-json/svg-spinners@1/icons.json').then((res) => res.json()),
+      },
+      {
+        name: 'vscode-icons',
+        loader: () =>
+          fetch('https://unpkg.com/@iconify-json/vscode-icons@1/icons.json').then((res) => res.json()),
+      },
+    ]);
     mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
     const input = document.getElementById("input");
@@ -268,6 +291,13 @@
   A[Start] --> B{Decision}
   B -->|Yes| C[Continue]
   B -->|No| D[End]`,
+
+      icons: `graph TD
+  A["fa:fa-home Home"] --> B["fa:fa-user User"]
+  B --> C["fa:fa-cog Settings"]
+  C --> D["fa:fa-sign-out Logout"]
+  E["logos:github GitHub"] --> F["logos:google Google"]
+  F --> G["simple-icons:javascript JavaScript"]`,
 
       sequence: `sequenceDiagram
   participant Alice
